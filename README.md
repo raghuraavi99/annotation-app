@@ -1,7 +1,7 @@
 # 💻 BioNLP Annotation App (Streamlit)
 
 This project is a simple and interactive **Streamlit-based annotation tool** that allows users to load, view, and annotate medical or clinical notes easily. It was built to help streamline the annotation process for research projects, especially those related to medical text analysis and NLP.
-
+ 
 
 ## Overview
 
