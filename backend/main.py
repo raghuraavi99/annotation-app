@@ -137,17 +137,18 @@ async def upload_folder(files: List[UploadFile] = File(...)):
  #return list(docs.values())   # IMPORTANT: return list of objects
 
 
+
 @app.get("/documents")
 def list_docs():
-    docs = load_json(DOC_FILE)
+    docs = load_json(DOC_FILE)  # this is a LIST
 
-    # Always include doc_id for the frontend
+    # Add a doc_id (index) for each document so the frontend can load it
     return [
         {
-            "doc_id": doc_id,
+            "doc_id": idx,
             **doc
         }
-        for doc_id, doc in docs.items()
+        for idx, doc in enumerate(docs)
     ]
 
 
