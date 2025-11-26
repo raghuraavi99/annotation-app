@@ -142,26 +142,51 @@ async def upload_folder(files: List[UploadFile] = File(...)):
 @app.get("/documents")
 def list_docs():
     """
-    Return all documents as a list, each with its doc_id.
-    The data file is a dict: { doc_id: {filename:..., text:...}, ... }
+    Return all documents as a list for the frontend.
+    Supports the stored data being either a dict or a list.
     """
     docs = load_json(DOC_FILE)
 
-    # If the file is missing or empty, be safe
-    if not isinstance(docs, dict):
+    # Nothing stored yet
+    if not docs:
         return []
 
-    result = []
-    for doc_id, doc in docs.items():
-        # each doc should be a dict, but be defensive
-        if isinstance(doc, dict):
-            item = {"doc_id": doc_id}
-            item.update(doc)
-        else:
-            item = {"doc_id": doc_id, "text": str(doc)}
-        result.append(item)
+    # Case 1: original format: { doc_id: {filename:..., text:...}, ... }
+    if isinstance(docs, dict):
+        result = []
+        for doc_id, doc in docs.items():
+            if isinstance(doc, dict):
+                item = {"doc_id": doc_id}
+                item.update(doc)
+            else:
+                # fallback if something is weird in the file
+                item = {
+                    "doc_id": doc_id,
+                    "filename": str(doc_id),
+                    "text": str(doc),
+                }
+            result.append(item)
+        return result
 
-    return result
+    # Case 2: docs is a list: [ {...}, {...} ]
+    if isinstance(docs, list):
+        result = []
+        for idx, doc in enumerate(docs):
+            if isinstance(doc, dict):
+                item = {"doc_id": str(idx)}
+                item.update(doc)
+            else:
+                item = {
+                    "doc_id": str(idx),
+                    "filename": f"doc_{idx}.txt",
+                    "text": str(doc),
+                }
+            result.append(item)
+        return result
+
+    # Anything else -> empty list
+    return []
+
 
 
 
