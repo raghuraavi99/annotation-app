@@ -3,7 +3,9 @@ import axios from "axios";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { saveAs } from "file-saver";
 
-const API_BASE = "http://127.0.0.1:8000";
+//const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ""; // e.g. "https://your-backend.example.com"
+
 
 function App() {
   const [message, setMessage] = useState("");
