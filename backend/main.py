@@ -147,11 +147,9 @@ def list_docs():
     """
     docs = load_json(DOC_FILE)
 
-    # Nothing stored yet
     if not docs:
         return []
 
-    # Case 1: original format: { doc_id: {filename:..., text:...}, ... }
     if isinstance(docs, dict):
         result = []
         for doc_id, doc in docs.items():
@@ -159,7 +157,6 @@ def list_docs():
                 item = {"doc_id": doc_id}
                 item.update(doc)
             else:
-                # fallback if something is weird in the file
                 item = {
                     "doc_id": doc_id,
                     "filename": str(doc_id),
@@ -168,7 +165,6 @@ def list_docs():
             result.append(item)
         return result
 
-    # Case 2: docs is a list: [ {...}, {...} ]
     if isinstance(docs, list):
         result = []
         for idx, doc in enumerate(docs):
@@ -184,7 +180,7 @@ def list_docs():
             result.append(item)
         return result
 
-    # Anything else -> empty list
+
     return []
 
 
