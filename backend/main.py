@@ -141,29 +141,28 @@ async def upload_folder(files: List[UploadFile] = File(...)):
 
 @app.get("/documents")
 def list_docs():
+    """
+    Return all documents as a list, each with its doc_id.
+    The data file is a dict: { doc_id: {filename:..., text:...}, ... }
+    """
     docs = load_json(DOC_FILE)
 
-    # If the JSON is a dict that wraps the list (just in case)
-    if isinstance(docs, dict) and "documents" in docs:
-        docs = docs["documents"]
-
-    # If it's not a list, just return empty to avoid crashing
-    if not isinstance(docs, list):
+    # If the file is missing or empty, be safe
+    if not isinstance(docs, dict):
         return []
 
-    # Add a numeric doc_id (index) for the frontend
     result = []
-    for idx, doc in enumerate(docs):
+    for doc_id, doc in docs.items():
+        # each doc should be a dict, but be defensive
         if isinstance(doc, dict):
-            # normal case: doc is {"filename": "...", "text": "...", ...}
-            item = {"doc_id": idx}
+            item = {"doc_id": doc_id}
             item.update(doc)
         else:
-            # fallback if something odd is in the list
-            item = {"doc_id": idx, "text": str(doc)}
+            item = {"doc_id": doc_id, "text": str(doc)}
         result.append(item)
 
     return result
+
 
 
 # --------------------------------------------------------
