@@ -131,60 +131,10 @@ async def upload_folder(files: List[UploadFile] = File(...)):
 # List documents
 # --------------------------------------------------------
 
-# @app.get("/documents")
-#def list_docs():
- #   docs = load_json(DOC_FILE)
- #return list(docs.values())   # IMPORTANT: return list of objects
-
-
-
-
 @app.get("/documents")
 def list_docs():
-    """
-    Return all documents as a list for the frontend.
-    Supports the stored data being either a dict or a list.
-    """
     docs = load_json(DOC_FILE)
-
-    if not docs:
-        return []
-
-    if isinstance(docs, dict):
-        result = []
-        for doc_id, doc in docs.items():
-            if isinstance(doc, dict):
-                item = {"doc_id": doc_id}
-                item.update(doc)
-            else:
-                item = {
-                    "doc_id": doc_id,
-                    "filename": str(doc_id),
-                    "text": str(doc),
-                }
-            result.append(item)
-        return result
-
-    if isinstance(docs, list):
-        result = []
-        for idx, doc in enumerate(docs):
-            if isinstance(doc, dict):
-                item = {"doc_id": str(idx)}
-                item.update(doc)
-            else:
-                item = {
-                    "doc_id": str(idx),
-                    "filename": f"doc_{idx}.txt",
-                    "text": str(doc),
-                }
-            result.append(item)
-        return result
-
-
-    return []
-
-
-
+    return list(docs.values())   # IMPORTANT: return list of objects
 
 # --------------------------------------------------------
 # Get document text
@@ -218,13 +168,21 @@ async def save_annot(
     if doc_id not in anns:
         anns[doc_id] = []
 
-    anns[doc_id].append({
+    def overlaps(a_start, a_end, b_start, b_end):
+        return a_start < b_end and b_start < a_end
+
+    current = anns[doc_id]
+    filtered = [a for a in current if not overlaps(a["start"], a["end"], start, end)]
+    filtered.append({
         "start": start,
         "end": end,
         "text": text,
         "label": label,
         "rank": rank
     })
+
+    filtered.sort(key=lambda x: x["start"])
+    anns[doc_id] = filtered
 
     save_json(ANN_FILE, anns)
     return {"status": "saved"}
@@ -238,6 +196,17 @@ def get_annots(doc_id: str):
     data = load_json(ANN_FILE)
     return data.get(doc_id, [])
 
+
+@app.delete("/annotations/{doc_id}/{index}")
+def delete_annotation(doc_id: str, index: int):
+    anns = load_json(ANN_FILE)
+    if doc_id not in anns or index < 0 or index >= len(anns[doc_id]):
+        return JSONResponse({"error": "annotation not found"}, status_code=404)
+
+    anns[doc_id].pop(index)
+    save_json(ANN_FILE, anns)
+    return {"status": "annotation deleted"}
+
 # --------------------------------------------------------
 # Label manager
 # --------------------------------------------------------
@@ -248,6 +217,17 @@ async def save_label(name: str = Form(...), color: str = Form(...)):
     labels[name] = color
     save_json(LABEL_FILE, labels)
     return {"status": "label saved"}
+
+
+@app.delete("/labels/{label_name}")
+async def delete_label(label_name: str):
+    labels = load_json(LABEL_FILE)
+    if label_name not in labels:
+        return JSONResponse({"error": "label not found"}, status_code=404)
+
+    labels.pop(label_name, None)
+    save_json(LABEL_FILE, labels)
+    return {"status": "label deleted"}
 
 @app.get("/labels")
 def get_label():
@@ -289,4 +269,3 @@ def export_word(doc_id: str):
     document.save(filename)
 
     return FileResponse(filename, filename)
-
