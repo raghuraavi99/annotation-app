@@ -171,6 +171,27 @@
   ],
   "cancer.report2.txt": [
     {
+      "start": 6,
+      "end": 13,
+      "text": "History",
+      "label": "MEDICATION",
+      "rank": ""
+    },
+    {
+      "start": 798,
+      "end": 806,
+      "text": "afebrile",
+      "label": "DIAGNOSIS",
+      "rank": ""
+    },
+    {
+      "start": 1308,
+      "end": 1316,
+      "text": "Surgical",
+      "label": "Test",
+      "rank": ""
+    },
+    {
       "start": 3229,
       "end": 3238,
       "text": "Decreased",
@@ -185,16 +206,9 @@
       "rank": ""
     },
     {
-      "start": 1308,
-      "end": 1316,
-      "text": "Surgical",
-      "label": "Test",
-      "rank": ""
-    },
-    {
-      "start": 798,
-      "end": 806,
-      "text": "afebrile",
+      "start": 3404,
+      "end": 3415,
+      "text": "Normoactive",
       "label": "DIAGNOSIS",
       "rank": ""
     }
@@ -243,6 +257,71 @@
       "text": "medications",
       "label": "PROCEDURE",
       "rank": "99"
+    },
+    {
+      "start": 2570,
+      "end": 2581,
+      "text": "medications",
+      "label": "DIAGNOSIS",
+      "rank": ""
+    }
+  ],
+  "cancer.report1.txt": [
+    {
+      "start": 4122,
+      "end": 4130,
+      "text": "platelet",
+      "label": "DIAGNOSIS",
+      "rank": "1"
+    },
+    {
+      "start": 4598,
+      "end": 4607,
+      "text": "tolerated",
+      "label": "MEDICATION",
+      "rank": "2"
+    },
+    {
+      "start": 2333,
+      "end": 2344,
+      "text": "respiratory",
+      "label": "SYMPTOM",
+      "rank": "3"
+    },
+    {
+      "start": 85,
+      "end": 95,
+      "text": "maintenanc",
+      "label": "SYMPTOM",
+      "rank": "3"
+    },
+    {
+      "start": 1297,
+      "end": 1301,
+      "text": "CD10",
+      "label": "DIAGNOSIS",
+      "rank": ""
+    },
+    {
+      "start": 4598,
+      "end": 4607,
+      "text": "tolerated",
+      "label": "DIAGNOSIS",
+      "rank": ""
+    },
+    {
+      "start": 4577,
+      "end": 4589,
+      "text": "asymptomatic",
+      "label": "DIAGNOSIS",
+      "rank": ""
+    },
+    {
+      "start": 4577,
+      "end": 4589,
+      "text": "asymptomatic",
+      "label": "MEDICATION",
+      "rank": ""
     }
   ]
 }
