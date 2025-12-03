@@ -85,7 +85,8 @@ const popupRef = useRef(null);
   const fetchAnnotations = async (docIdValue) => {
     if (!docIdValue) return;
     try {
-      const res = await axios.get(`${API_BASE}/annotations/${docIdValue}`);
+      const encodedId = encodeURIComponent(docIdValue);
+      const res = await axios.get(`${API_BASE}/annotations/${encodedId}`);
       setAnnotations(res.data || []);
     } catch (e) {
       console.error("Failed to load annotations", e);
@@ -210,7 +211,8 @@ const popupRef = useRef(null);
 
   const handleSelectDocument = async (docIdValue) => {
     try {
-      const res = await axios.get(`${API_BASE}/document/${docIdValue}`);
+      const encodedId = encodeURIComponent(docIdValue);
+      const res = await axios.get(`${API_BASE}/document/${encodedId}`);
       const text = (res.data.text || "").replace(/\r\n/g, "\n");
       setUploadedText(text);
       setDocId(docIdValue);
@@ -505,7 +507,8 @@ useEffect(() => {
     try {
       const entries = await Promise.all(
         selectedDocs.map(async (docId) => {
-          const res = await axios.get(`${API_BASE}/annotations/${docId}`);
+          const encodedId = encodeURIComponent(docId);
+          const res = await axios.get(`${API_BASE}/annotations/${encodedId}`);
           return { doc_id: docId, annotations: res.data || [] };
         })
       );
