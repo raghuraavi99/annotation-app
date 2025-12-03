@@ -15,6 +15,7 @@ function App() {
 
   const [documents, setDocuments] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDocs, setSelectedDocs] = useState([]);
 
   // Label manager inputs
   const [newLabelName, setNewLabelName] = useState("");
@@ -62,6 +63,9 @@ const popupRef = useRef(null);
 
     const docs = Array.isArray(res.data) ? res.data : [];
     setDocuments(docs);
+    setSelectedDocs((prev) =>
+      prev.filter((id) => docs.some((doc) => doc.doc_id === id))
+    );
 
   } catch (e) {
     console.error("Failed to load documents:", e);
@@ -443,6 +447,65 @@ useEffect(() => {
     Packer.toBlob(doc).then((blob) => {
       saveAs(blob, `${docId || "document"}_annotated.docx`);
     });
+  };
+
+  const toggleDocSelection = (docId) => {
+    setSelectedDocs((prev) =>
+      prev.includes(docId)
+        ? prev.filter((id) => id !== docId)
+        : [...prev, docId]
+    );
+  };
+
+  const downloadSelectedDocuments = () => {
+    if (!selectedDocs.length) {
+      alert("Select at least one document first.");
+      return;
+    }
+    const payload = selectedDocs
+      .map((id) => documents.find((doc) => doc.doc_id === id))
+      .filter(Boolean)
+      .map(({ doc_id, filename, text }) => ({ doc_id, filename, text }));
+    if (!payload.length) {
+      alert("Selected documents are unavailable.");
+      return;
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "selected_documents.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadSelectedAnnotations = async () => {
+    if (!selectedDocs.length) {
+      alert("Select at least one document to download annotations.");
+      return;
+    }
+    try {
+      const entries = await Promise.all(
+        selectedDocs.map(async (docId) => {
+          const res = await axios.get(`${API_BASE}/annotations/${docId}`);
+          return { doc_id: docId, annotations: res.data || [] };
+        })
+      );
+      const blob = new Blob([JSON.stringify(entries, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "selected_annotations.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Failed to download annotations", e);
+      alert("Could not download selected annotations.");
+    }
   };
 
   // ----------------- Render annotated text -----------------
@@ -935,20 +998,37 @@ useEffect(() => {
                         fontSize: "14px",
                       }}
                     >
-                      <button
-                        onClick={() => handleSelectDocument(doc.doc_id)}
+                      <div
                         style={{
-                          border: "none",
-                          background: "none",
-                          textDecoration: "underline",
-                          cursor: "pointer",
-                          padding: 0,
-                          fontWeight: doc.doc_id === docId ? "bold" : "normal",
-                          color: "#2563eb",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
                         }}
                       >
-                        {doc.filename}
-                      </button>
+                        <input
+                          type="checkbox"
+                          checked={selectedDocs.includes(doc.doc_id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleDocSelection(doc.doc_id);
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSelectDocument(doc.doc_id)}
+                          style={{
+                            border: "none",
+                            background: "none",
+                            textDecoration: "underline",
+                            cursor: "pointer",
+                            padding: 0,
+                            fontWeight:
+                              doc.doc_id === docId ? "bold" : "normal",
+                            color: "#2563eb",
+                          }}
+                        >
+                          {doc.filename}
+                        </button>
+                      </div>
                       <span style={{ fontSize: "11px", color: "#666" }}>
                         {" "}
                         – {doc.preview}
@@ -957,6 +1037,39 @@ useEffect(() => {
                   ))}
                 </ul>
               )}
+              <div
+                style={{
+                  marginTop: "12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                }}
+              >
+                <button
+                  onClick={downloadSelectedDocuments}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #ddd",
+                    background: "#f3f4f6",
+                    cursor: "pointer",
+                  }}
+                >
+                  Download Selected Documents (.json)
+                </button>
+                <button
+                  onClick={downloadSelectedAnnotations}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    border: "1px solid #ddd",
+                    background: "#e0f2fe",
+                    cursor: "pointer",
+                  }}
+                >
+                  Download Selected Annotations (.json)
+                </button>
+              </div>
             </div>
           </div>
         </div>

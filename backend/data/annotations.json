@@ -323,5 +323,21 @@
       "label": "MEDICATION",
       "rank": ""
     }
+  ],
+  "cancer.report2.txt_annotated.txt": [
+    {
+      "start": 860,
+      "end": 868,
+      "text": "Pharmacy",
+      "label": "MEDICATION",
+      "rank": ""
+    },
+    {
+      "start": 1215,
+      "end": 1223,
+      "text": "lymphoma",
+      "label": "Test",
+      "rank": ""
+    }
   ]
 }
