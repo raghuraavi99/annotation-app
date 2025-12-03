@@ -319,6 +319,22 @@ useEffect(() => {
     }
   };
 
+  const handleDeleteLabel = async (labelName) => {
+    if (!labelName) return;
+    const confirmed = window.confirm(
+      `Delete label "${labelName}"? This does not modify already-saved annotations.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await axios.delete(`${API_BASE}/labels/${encodeURIComponent(labelName)}`);
+      await fetchLabels();
+    } catch (e) {
+      console.error("Failed to delete label", e);
+      alert("Could not delete label.");
+    }
+  };
+
   // ----------------- Downloads -----------------
 
   const downloadAnnotations = () => {
@@ -1340,9 +1356,18 @@ useEffect(() => {
               {labelNames.length === 0 ? (
                 <p style={{ fontStyle: "italic" }}>No labels defined yet.</p>
               ) : (
-                <ul>
+                <ul style={{ paddingLeft: 0 }}>
                   {labelNames.map((name) => (
-                    <li key={name}>
+                    <li
+                      key={name}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        marginBottom: "6px",
+                        listStyle: "none",
+                      }}
+                    >
                       <span
                         style={{
                           display: "inline-block",
@@ -1353,7 +1378,23 @@ useEffect(() => {
                           border: "1px solid #333",
                         }}
                       ></span>
-                      <strong>{name}</strong> — <code>{labels[name]}</code>
+                      <div style={{ flex: 1 }}>
+                        <strong>{name}</strong> — <code>{labels[name]}</code>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteLabel(name)}
+                        style={{
+                          border: "none",
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                          borderRadius: "4px",
+                          padding: "2px 6px",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                        }}
+                      >
+                        Delete
+                      </button>
                     </li>
                   ))}
                 </ul>
