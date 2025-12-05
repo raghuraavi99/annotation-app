@@ -3,7 +3,7 @@ import axios from "axios";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { saveAs } from "file-saver";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "https://annotation-backend-qhsw.onrender.com";
 
 function App() {
   const [message, setMessage] = useState("");
