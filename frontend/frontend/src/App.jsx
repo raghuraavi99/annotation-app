@@ -9,6 +9,13 @@ function App() {
   const [message, setMessage] = useState("");
   const [uploadedText, setUploadedText] = useState("");
   const [docId, setDocId] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [currentUser, setCurrentUser] = useState(
+    localStorage.getItem("username") || ""
+  );
+  const [authUsername, setAuthUsername] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
 
   const [annotations, setAnnotations] = useState([]);
   const [labels, setLabels] = useState({}); // { name: color }
@@ -34,16 +41,20 @@ function App() {
     rank: "",
   });
 
-  
-const popupRef = useRef(null);
-
+  const popupRef = useRef(null);
 
   // Sidebar state (collapsible)
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const isAuthenticated = Boolean(token);
+
   // ----------------- Backend check (simple) -----------------
 
   const testAPI = async () => {
+    if (!isAuthenticated) {
+      setMessage("Please log in to test the backend.");
+      return;
+    }
     try {
       const res = await axios.get(`${API_BASE}/documents`);
       setMessage(
@@ -51,58 +62,170 @@ const popupRef = useRef(null);
       );
     } catch (error) {
       console.error(error);
-      setMessage("Error: cannot connect to backend");
+      if (error.response?.status === 401) {
+        setMessage("Unauthorized – please log in.");
+      } else {
+        setMessage("Error: cannot connect to backend");
+      }
     }
   };
+
+  // ----------------- Auth helpers -----------------
+
+  const persistSession = (newToken, username) => {
+    localStorage.setItem("token", newToken);
+    localStorage.setItem("username", username);
+    setToken(newToken);
+    setCurrentUser(username);
+  };
+
+  const clearSession = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    setToken("");
+    setCurrentUser("");
+    setAuthUsername("");
+    setAuthPassword("");
+    resetWorkspace();
+  };
+
+  const handleRegister = async () => {
+    if (!authUsername.trim() || !authPassword) {
+      setAuthMessage("Please enter both username and password.");
+      return;
+    }
+    try {
+      await axios.post(`${API_BASE}/register`, {
+        username: authUsername.trim(),
+        password: authPassword,
+      });
+      setAuthMessage("Registration successful. You can now log in.");
+    } catch (e) {
+      console.error("Registration failed", e);
+      const errorMsg = e.response?.data?.error || "Registration failed.";
+      setAuthMessage(errorMsg);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!authUsername.trim() || !authPassword) {
+      setAuthMessage("Please enter both username and password.");
+      return;
+    }
+    try {
+      const res = await axios.post(`${API_BASE}/login`, {
+        username: authUsername.trim(),
+        password: authPassword,
+      });
+      persistSession(res.data.token, res.data.username);
+      setAuthUsername("");
+      setAuthPassword("");
+      setAuthMessage("Logged in successfully.");
+    } catch (e) {
+      console.error("Login failed", e);
+      const errorMsg = e.response?.data?.error || "Login failed.";
+      setAuthMessage(errorMsg);
+    }
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    setAuthMessage("Logged out.");
+  };
+
+  const resetWorkspace = () => {
+    setDocuments([]);
+    setSelectedDocs([]);
+    setLabels({});
+    setAnnotations([]);
+    setUploadedText("");
+    setDocId(null);
+  };
+
+  const requireAuth = () => {
+    if (!isAuthenticated) {
+      alert("Please log in first.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleAuthError = (error) => {
+    if (error?.response?.status === 401) {
+      clearSession();
+      setAuthMessage("Session expired. Please log in again.");
+      return true;
+    }
+    return false;
+  };
+
+  useEffect(() => {
+    if (token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    } else {
+      delete axios.defaults.headers.common["Authorization"];
+    }
+  }, [token]);
 
   // ----------------- Helpers: load docs / labels / annotations -----------------
 
   const loadDocuments = async () => {
-  try {
-    const res = await axios.get(`${API_BASE}/documents`);
+    if (!token) return;
+    try {
+      const res = await axios.get(`${API_BASE}/documents`);
 
-    const docs = Array.isArray(res.data) ? res.data : [];
-    setDocuments(docs);
-    setSelectedDocs((prev) =>
-      prev.filter((id) => docs.some((doc) => doc.doc_id === id))
-    );
-
-  } catch (e) {
-    console.error("Failed to load documents:", e);
-    setDocuments([]);
-  }
-};
+      const docs = Array.isArray(res.data) ? res.data : [];
+      setDocuments(docs);
+      setSelectedDocs((prev) =>
+        prev.filter((id) => docs.some((doc) => doc.doc_id === id))
+      );
+    } catch (e) {
+      console.error("Failed to load documents:", e);
+      if (!handleAuthError(e)) {
+        setDocuments([]);
+      }
+    }
+  };
 
   const fetchLabels = async () => {
+    if (!token) return;
     try {
       const res = await axios.get(`${API_BASE}/labels`);
       setLabels(res.data || {});
     } catch (e) {
       console.error("Failed to load labels", e);
+      handleAuthError(e);
     }
   };
 
   const fetchAnnotations = async (docIdValue) => {
-    if (!docIdValue) return;
+    if (!docIdValue || !token) return;
     try {
       const encodedId = encodeURIComponent(docIdValue);
       const res = await axios.get(`${API_BASE}/annotations/${encodedId}`);
       setAnnotations(res.data || []);
     } catch (e) {
       console.error("Failed to load annotations", e);
+      handleAuthError(e);
     }
   };
 
   useEffect(() => {
-    loadDocuments();
-    fetchLabels();
-  }, []);
+    if (token) {
+      loadDocuments();
+      fetchLabels();
+    }
+  }, [token]);
 
   // ----------------- Uploads -----------------
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
+    if (!requireAuth()) {
+      event.target.value = "";
+      return;
+    }
 
     const formData = new FormData();
     formData.append("file", file);
@@ -112,16 +235,14 @@ const popupRef = useRef(null);
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const text = (res.data.text || "").replace(/\r\n/g, "\n");
       const docIdValue = res.data.doc_id;
-
-      setUploadedText(text);
-      setDocId(docIdValue);
-      await fetchAnnotations(docIdValue);
+      await handleSelectDocument(docIdValue);
       await loadDocuments();
     } catch (error) {
       console.error(error);
-      alert("Upload failed – check backend logs.");
+      if (!handleAuthError(error)) {
+        alert("Upload failed – check backend logs.");
+      }
     } finally {
       event.target.value = "";
     }
@@ -130,6 +251,10 @@ const popupRef = useRef(null);
   const handleZipUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
+    if (!requireAuth()) {
+      event.target.value = "";
+      return;
+    }
 
     const formData = new FormData();
     formData.append("file", file);
@@ -139,10 +264,19 @@ const popupRef = useRef(null);
         headers: { "Content-Type": "multipart/form-data" },
       });
       await loadDocuments();
-      alert(`Uploaded ${res.data.saved?.length || 0} documents from zip.`);
+      const savedCount = Array.isArray(res.data.saved)
+        ? res.data.saved.length
+        : null;
+      alert(
+        savedCount !== null
+          ? `Uploaded ${savedCount} documents from zip.`
+          : "ZIP upload completed."
+      );
     } catch (e) {
       console.error("ZIP upload failed", e);
-      alert("ZIP upload failed.");
+      if (!handleAuthError(e)) {
+        alert("ZIP upload failed.");
+      }
     } finally {
       event.target.value = "";
     }
@@ -151,6 +285,10 @@ const popupRef = useRef(null);
   const handleFolderUpload = async (event) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
+    if (!requireAuth()) {
+      event.target.value = "";
+      return;
+    }
 
     const formData = new FormData();
     for (const file of files) {
@@ -158,14 +296,17 @@ const popupRef = useRef(null);
     }
 
     try {
-      const res = await axios.post(`${API_BASE}/upload-multi`, formData, {
+      const res = await axios.post(`${API_BASE}/upload-folder`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       await loadDocuments();
-      alert(`Uploaded ${res.data.saved?.length || files.length} files.`);
+      const savedCount = res.data.saved?.length || files.length;
+      alert(`Uploaded ${savedCount} files.`);
     } catch (e) {
       console.error("Folder upload failed", e);
-      alert("Folder upload failed.");
+      if (!handleAuthError(e)) {
+        alert("Folder upload failed.");
+      }
     } finally {
       event.target.value = "";
     }
@@ -178,6 +319,7 @@ const popupRef = useRef(null);
       alert("Please paste some text first.");
       return;
     }
+    if (!requireAuth()) return;
 
     try {
       const blob = new Blob([manualText], { type: "text/plain" });
@@ -191,25 +333,25 @@ const popupRef = useRef(null);
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const text = (res.data.text || "").replace(/\r\n/g, "\n");
       const docIdValue = res.data.doc_id;
 
-      setUploadedText(text);
-      setDocId(docIdValue);
+      await handleSelectDocument(docIdValue);
       setManualText("");
-      await fetchAnnotations(docIdValue);
       await loadDocuments();
 
       alert("Text saved as a new document!");
     } catch (e) {
       console.error("Manual text submit failed", e);
-      alert("Failed to save text.");
+      if (!handleAuthError(e)) {
+        alert("Failed to save text.");
+      }
     }
   };
 
   // ----------------- Select document -----------------
 
   const handleSelectDocument = async (docIdValue) => {
+    if (!requireAuth()) return;
     try {
       const encodedId = encodeURIComponent(docIdValue);
       const res = await axios.get(`${API_BASE}/document/${encodedId}`);
@@ -219,7 +361,9 @@ const popupRef = useRef(null);
       await fetchAnnotations(docIdValue);
     } catch (e) {
       console.error("Failed to load document", e);
-      alert("Could not load document.");
+      if (!handleAuthError(e)) {
+        alert("Could not load document.");
+      }
     }
   };
 
@@ -278,7 +422,7 @@ useEffect(() => {
   // ----------------- Save annotation -----------------
 
   const handleLabelClick = async (labelName) => {
-    if (!popup.selection || !docId) return;
+    if (!requireAuth() || !popup.selection || !docId) return;
 
     const { start, end, text } = popup.selection;
 
@@ -295,16 +439,35 @@ useEffect(() => {
       await fetchAnnotations(docId);
     } catch (e) {
       console.error("Failed to save annotation", e);
-      alert("Could not save annotation.");
+      if (!handleAuthError(e)) {
+        alert("Could not save annotation.");
+      }
     }
 
     setPopup({ visible: false, selection: null });
+  };
+
+  const handleDeleteAnnotation = async (index) => {
+    if (!docId || !requireAuth()) return;
+    const ok = window.confirm("Delete this annotation?");
+    if (!ok) return;
+    try {
+      const encodedDoc = encodeURIComponent(docId);
+      await axios.delete(`${API_BASE}/annotations/${encodedDoc}/${index}`);
+      await fetchAnnotations(docId);
+    } catch (e) {
+      console.error("Failed to delete annotation", e);
+      if (!handleAuthError(e)) {
+        alert("Could not delete annotation.");
+      }
+    }
   };
 
   // ----------------- Label manager -----------------
 
   const handleAddLabel = async () => {
     if (!newLabelName.trim()) return;
+    if (!requireAuth()) return;
 
     const formData = new FormData();
     formData.append("name", newLabelName.trim());
@@ -317,12 +480,15 @@ useEffect(() => {
       setNewLabelColor("#ffff99");
     } catch (e) {
       console.error("Failed to add label", e);
-      alert("Could not add label.");
+      if (!handleAuthError(e)) {
+        alert("Could not add label.");
+      }
     }
   };
 
   const handleDeleteLabel = async (labelName) => {
     if (!labelName) return;
+    if (!requireAuth()) return;
     const confirmed = window.confirm(
       `Delete label "${labelName}"? This does not modify already-saved annotations.`
     );
@@ -333,7 +499,9 @@ useEffect(() => {
       await fetchLabels();
     } catch (e) {
       console.error("Failed to delete label", e);
-      alert("Could not delete label.");
+      if (!handleAuthError(e)) {
+        alert("Could not delete label.");
+      }
     }
   };
 
@@ -468,6 +636,7 @@ useEffect(() => {
   };
 
   const toggleDocSelection = (docId) => {
+    if (!requireAuth()) return;
     setSelectedDocs((prev) =>
       prev.includes(docId)
         ? prev.filter((id) => id !== docId)
@@ -476,6 +645,7 @@ useEffect(() => {
   };
 
   const downloadSelectedDocuments = () => {
+    if (!requireAuth()) return;
     if (!selectedDocs.length) {
       alert("Select at least one document first.");
       return;
@@ -500,6 +670,7 @@ useEffect(() => {
   };
 
   const downloadSelectedAnnotations = async () => {
+    if (!requireAuth()) return;
     if (!selectedDocs.length) {
       alert("Select at least one document to download annotations.");
       return;
@@ -523,7 +694,9 @@ useEffect(() => {
       URL.revokeObjectURL(url);
     } catch (e) {
       console.error("Failed to download annotations", e);
-      alert("Could not download selected annotations.");
+      if (!handleAuthError(e)) {
+        alert("Could not download selected annotations.");
+      }
     }
   };
 
@@ -802,6 +975,111 @@ useEffect(() => {
           </button>
         </div>
 
+        {/* Account */}
+        <div
+          style={{
+            background: "white",
+            padding: "20px",
+            borderRadius: "12px",
+            marginBottom: "25px",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+            border: "1px solid #e2e2e2",
+            maxWidth: "600px",
+          }}
+        >
+          <h2 style={{ marginTop: 0 }}>Account</h2>
+          {isAuthenticated ? (
+            <>
+              <p style={{ marginBottom: "10px" }}>
+                Logged in as <strong>{currentUser}</strong>
+              </p>
+              <button
+                onClick={handleLogout}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "#dc2626",
+                  color: "white",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                  marginBottom: "12px",
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="Username"
+                  value={authUsername}
+                  onChange={(e) => setAuthUsername(e.target.value)}
+                  style={{
+                    flex: "1 1 180px",
+                    padding: "8px",
+                    borderRadius: "6px",
+                    border: "1px solid #ccc",
+                  }}
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  style={{
+                    flex: "1 1 180px",
+                    padding: "8px",
+                    borderRadius: "6px",
+                    border: "1px solid #ccc",
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <button
+                  onClick={handleLogin}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "none",
+                    background: "#2563eb",
+                    color: "white",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={handleRegister}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    border: "1px solid #2563eb",
+                    background: "white",
+                    color: "#2563eb",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  Register
+                </button>
+              </div>
+            </>
+          )}
+          {authMessage && (
+            <p style={{ marginTop: "12px", color: "#0f172a" }}>{authMessage}</p>
+          )}
+        </div>
+
         {/* Backend status */}
         <div style={{ marginBottom: "20px" }}>
           <button
@@ -852,6 +1130,11 @@ useEffect(() => {
               >
                 📚 Document Library
               </h2>
+              {!isAuthenticated && (
+                <p style={{ color: "#b91c1c" }}>
+                  Log in to upload files or view your documents.
+                </p>
+              )}
 
               <div style={{ marginBottom: "10px" }}>
                 <input
@@ -1241,11 +1524,35 @@ useEffect(() => {
                 No annotations yet. Select text and choose a label.
               </p>
             ) : (
-              <ul>
+              <ul style={{ paddingLeft: "16px" }}>
                 {annotations.map((ann, idx) => (
-                  <li key={idx}>
-                    <strong>{ann.label}</strong> — [{ann.start}, {ann.end}) — “
-                    {ann.text}”
+                  <li
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span style={{ flex: 1 }}>
+                      <strong>{ann.label}</strong> — [{ann.start}, {ann.end}) — “
+                      {ann.text}”
+                    </span>
+                    <button
+                      onClick={() => handleDeleteAnnotation(idx)}
+                      style={{
+                        border: "none",
+                        background: "#fee2e2",
+                        color: "#b91c1c",
+                        borderRadius: "4px",
+                        padding: "3px 8px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Delete
+                    </button>
                   </li>
                 ))}
               </ul>
