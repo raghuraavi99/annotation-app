@@ -42,6 +42,7 @@ function App() {
   });
 
   const popupRef = useRef(null);
+  const textContainerRef = useRef(null);
 
   // Sidebar state (collapsible)
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -367,56 +368,88 @@ function App() {
     }
   };
 
+  const handleDeleteDocument = async (docIdValue) => {
+    if (!requireAuth()) return;
+    const confirmed = window.confirm(
+      `Delete "${docIdValue}"? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const encodedId = encodeURIComponent(docIdValue);
+      await axios.delete(`${API_BASE}/document/${encodedId}`);
+      setSelectedDocs((prev) => prev.filter((id) => id !== docIdValue));
+      if (docId === docIdValue) {
+        setDocId(null);
+        setUploadedText("");
+        setAnnotations([]);
+      }
+      await loadDocuments();
+    } catch (e) {
+      console.error("Failed to delete document", e);
+      if (!handleAuthError(e)) {
+        alert("Could not delete document.");
+      }
+    }
+  };
+
   // ----------------- Selection & popup -----------------
 
   // ---------------- Selection & popup ----------------
-useEffect(() => {
+  useEffect(() => {
     if (!uploadedText) return;
 
+    const computeOffsets = (range) => {
+      if (!textContainerRef.current) return null;
+      const container = textContainerRef.current;
+      if (!container.contains(range.commonAncestorContainer)) return null;
+
+      const preRange = range.cloneRange();
+      preRange.selectNodeContents(container);
+      preRange.setEnd(range.startContainer, range.startOffset);
+      const start = preRange.toString().length;
+
+      const selectedText = range.toString();
+      const end = start + selectedText.length;
+
+      return { start, end, text: selectedText };
+    };
+
     const handleMouseUp = (event) => {
-        if (popupRef.current && popupRef.current.contains(event.target)) {
-            return;
-        }
+      if (popupRef.current && popupRef.current.contains(event.target)) {
+        return;
+      }
 
-        const sel = window.getSelection();
-        if (!sel || sel.isCollapsed) {
-            setPopup(p => ({ ...p, visible: false }));
-            return;
-        }
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed) {
+        setPopup((p) => ({ ...p, visible: false }));
+        return;
+      }
 
-        const selectedText = sel.toString();
-        if (!selectedText.trim()) {
-            setPopup(p => ({ ...p, visible: false }));
-            return;
-        }
+      const range = sel.getRangeAt(0);
+      const offsets = computeOffsets(range);
+      if (!offsets || !offsets.text.trim()) {
+        setPopup((p) => ({ ...p, visible: false }));
+        return;
+      }
 
-        const startIndex = uploadedText.indexOf(selectedText);
-        if (startIndex === -1) {
-            setPopup(p => ({ ...p, visible: false }));
-            return;
-        }
-
-        const endIndex = startIndex + selectedText.length;
-
-        try {
-            const range = sel.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-
-            setPopup({
-                visible: true,
-                top: rect.top - 50,
-                left: rect.left,
-                selection: { text: selectedText, start: startIndex, end: endIndex },
-                rank: ""   // keep rank field
-            });
-        } catch (e) {
-            console.error(e);
-        }
+      const rect = range.getBoundingClientRect();
+      setPopup({
+        visible: true,
+        top: rect.top - 50,
+        left: rect.left,
+        selection: {
+          text: offsets.text,
+          start: offsets.start,
+          end: offsets.end,
+        },
+        rank: "",
+      });
     };
 
     document.addEventListener("mouseup", handleMouseUp);
     return () => document.removeEventListener("mouseup", handleMouseUp);
-}, [uploadedText]);
+  }, [uploadedText]);
 
 
   // ----------------- Save annotation -----------------
@@ -1330,6 +1363,22 @@ useEffect(() => {
                         >
                           {doc.filename}
                         </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDocument(doc.doc_id);
+                          }}
+                          style={{
+                            border: "none",
+                            background: "none",
+                            color: "#dc2626",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                          }}
+                          title={`Delete ${doc.filename}`}
+                        >
+                          🗑️
+                        </button>
                       </div>
                       <span style={{ fontSize: "11px", color: "#666" }}>
                         {" "}
@@ -1416,6 +1465,7 @@ useEffect(() => {
 
             <div style={{ position: "relative" }}>
               <pre
+                ref={textContainerRef}
                 style={{
                   whiteSpace: "pre-wrap",
                   background: "#fff",

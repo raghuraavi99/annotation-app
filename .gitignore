@@ -1,0 +1,21 @@
+# OS files
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Backend local files
+backend/.gitignore
+backend/venv/
+backend/__pycache__/
+backend/.DS_Store
+
+# Frontend
+frontend/frontend/node_modules/
+frontend/frontend/dist/
+
+# Logs
+*.log
+
